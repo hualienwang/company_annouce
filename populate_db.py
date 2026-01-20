@@ -189,8 +189,8 @@ def populate_database():
     print("開始填充數據庫...")
     print("=" * 60)
 
-    # 使用SQLite數據庫
-    DATABASE_URL = f"sqlite:///data/company.db"
+    # 使用SQLite數據庫（使用絕對路徑）
+    DATABASE_URL = f"sqlite:////workspace/data/company.db"
     engine = create_engine(DATABASE_URL)
     
     with Session(engine) as session:
