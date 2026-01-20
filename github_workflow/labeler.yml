@@ -1,0 +1,62 @@
+# 自动标记配置文件
+# 用于自动为 Issue 和 Pull Request 添加标签
+
+# 标签映射规则
+bug:
+  - "**/*bug*"
+  - "**/*fix*"
+  - "**/*error*"
+  - "**/*crash*"
+
+feature:
+  - "**/*feature*"
+  - "**/*enhancement*"
+  - "**/*new*"
+  - "**/*add*"
+
+documentation:
+  - "**/*.md"
+  - "**/*doc*"
+  - "**/*readme*"
+  - "**/docs/**"
+
+refactor:
+  - "**/*refactor*"
+  - "**/*clean*"
+  - "***optimize*"
+
+backend:
+  - "backend/**"
+  - "**/requirements.txt"
+  - "**/*.py"
+
+frontend:
+  - "frontend/**"
+  - "frontend/**"
+  - "**/package.json"
+  - "**/*.vue"
+  - "**/*.ts"
+  - "**/*.tsx"
+
+ci-cd:
+  - ".github/**"
+  - "**/*dockerfile*"
+  - "**/*docker-compose*"
+  - "**/*.yml"
+  - "**/*.yaml"
+
+security:
+  - "**/*security*"
+  - "**/*auth*"
+  - "**/*permission*"
+
+database:
+  - "**/*db*"
+  - "**/*sql*"
+  - "**/*migration*"
+  - "**/*schema*"
+
+testing:
+  - "**/*test*"
+  - "**/*spec*"
+  - "**/__tests__/**"

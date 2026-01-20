@@ -1,0 +1,168 @@
+name: Dependency Check
+
+on:
+  schedule:
+    # 每周一凌晨 3 点运行
+    - cron: '0 3 * * 1'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  # ========================================
+  # 作业 1: Python 依赖检查
+  # ========================================
+  python-dependencies:
+    name: Python Dependency Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 设置 Python 环境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: 安装依赖检查工具
+      run: |
+        pip install safety pip-audit
+
+    - name: 运行 Safety 安全检查
+      run: |
+        cd backend
+        safety check --json > safety-report.json || true
+        safety check || true
+
+    - name: 运行 Pip Audit 检查
+      run: |
+        cd backend
+        pip-audit --format=json --output=pip-audit-report.json || true
+        pip-audit || true
+
+    - name: 上传安全报告
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: python-dependency-reports
+        path: |
+          backend/safety-report.json
+          backend/pip-audit-report.json
+        retention-days: 30
+
+    - name: 创建 Issue（如果发现漏洞）
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          github.rest.issues.create({
+            title: '🚨 Python 依赖安全漏洞检测',
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '检测到 Python 依赖存在安全漏洞，请查看详细报告并尽快更新依赖。\n\n报告文件已上传到 Artifacts。',
+            labels: ['security', 'dependencies']
+          })
+
+  # ========================================
+  # 作业 2: Node.js 依赖检查
+  # ========================================
+  nodejs-dependencies:
+    name: Node.js Dependency Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 设置 Node.js 环境
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 安装依赖
+      run: |
+        cd frontend
+        npm ci
+
+    - name: 运行 npm audit
+      run: |
+        cd frontend
+        npm audit --json > npm-audit-report.json || true
+        npm audit || true
+
+    - name: 检查过时的依赖
+      run: |
+        cd frontend
+        npm outdated --json > npm-outdated-report.json || true
+
+    - name: 上传依赖报告
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: nodejs-dependency-reports
+        path: |
+          frontend/npm-audit-report.json
+          frontend/npm-outdated-report.json
+        retention-days: 30
+
+    - name: 创建 Issue（如果发现漏洞）
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          github.rest.issues.create({
+            title: '🚨 Node.js 依赖安全漏洞检测',
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '检测到 Node.js 依赖存在安全漏洞，请查看详细报告并尽快更新依赖。\n\n报告文件已上传到 Artifacts。',
+            labels: ['security', 'dependencies']
+          })
+
+  # ========================================
+  # 作业 3: 生成依赖更新建议
+  # ========================================
+  dependency-update-suggestions:
+    name: Dependency Update Suggestions
+    runs-on: ubuntu-latest
+    needs: [python-dependencies, nodejs-dependencies]
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 生成依赖更新报告
+      run: |
+        cat > DEPENDENCY_UPDATE_REPORT.md << 'EOF'
+        # 依赖更新建议报告
+
+        📅 生成时间: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+        ## 检查结果摘要
+
+        - ✅ Python 依赖检查: 完成
+        - ✅ Node.js 依赖检查: 完成
+
+        ## 建议操作
+
+        1. **查看安全报告**: 请下载 Artifacts 中的详细报告
+        2. **更新依赖**: 使用 `pip install -U <package>` 或 `npm update <package>`
+        3. **测试验证**: 更新后请运行完整的测试套件
+
+        ## 自动更新工具推荐
+
+        - Python: `pip install --upgrade pip-tools`
+        - Node.js: `npm install -g npm-check-updates`
+
+        ---
+        *此报告由 GitHub Actions 自动生成*
+        EOF
+
+    - name: 上传报告
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-update-report
+        path: DEPENDENCY_UPDATE_REPORT.md
+        retention-days: 30

@@ -1,0 +1,148 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # 每天凌晨 2 点运行
+    - cron: '0 2 * * *'
+
+jobs:
+  # ========================================
+  # 作业 1: Python 代码质量分析
+  # ========================================
+  python-quality:
+    name: Python Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 设置 Python 环境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: 安装依赖
+      run: |
+        pip install black flake8 mypy pylint bandit
+
+    - name: 运行 Black 格式检查
+      run: |
+        black --check backend/ --diff
+
+    - name: 运行 Flake8 代码检查
+      run: |
+        flake8 backend/ --max-line-length=120 --ignore=E501,W503 --show-source --statistics
+
+    - name: 运行 Pylint 代码检查
+      run: |
+        pylint backend/ --disable=C0114,C0115,C0116 --output-format=colorized || true
+
+    - name: 运行 Bandit 安全检查
+      run: |
+        bandit -r backend/ -f json -o bandit-report.json || true
+
+    - name: 上传 Bandit 安全报告
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bandit-security-report
+        path: bandit-report.json
+        retention-days: 30
+
+  # ========================================
+  # 作业 2: JavaScript 代码质量分析
+  # ========================================
+  javascript-quality:
+    name: JavaScript/TypeScript Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 设置 Node.js 环境
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 安装依赖
+      run: |
+        cd frontend
+        npm ci
+        npm install -D eslint prettier eslint-plugin-vue @typescript-eslint/parser @typescript-eslint/eslint-plugin
+
+    - name: 运行 ESLint
+      run: |
+        cd frontend
+        npx eslint src/ --format json -o eslint-report.json || true
+
+    - name: 运行 Prettier
+      run: |
+        cd frontend
+        npx prettier --check src/ --write || true
+
+    - name: 上传 ESLint 报告
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: eslint-report
+        path: frontend/eslint-report.json
+        retention-days: 30
+
+  # ========================================
+  # 作业 3: 代码复杂度分析
+  # ========================================
+  complexity-analysis:
+    name: Code Complexity Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 设置 Python 环境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: 安装依赖
+      run: |
+        pip install radon lizard
+
+    - name: 运行 Radon 代码复杂度分析
+      run: |
+        radon cc backend/ -a -s > radon-report.txt
+        radon mi backend/ -s >> radon-report.txt
+
+    - name: 运行 Lizard 代码复杂度分析
+      run: |
+        lizard frontend/src backend/ -l JavaScript,Python -o lizard-report.json || true
+
+    - name: 上传复杂度报告
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: complexity-reports
+        path: |
+          radon-report.txt
+          lizard-report.json
+        retention-days: 30
+
+    - name: 输出复杂度摘要
+      if: always()
+      run: |
+        echo "📊 代码复杂度分析报告："
+        cat radon-report.txt

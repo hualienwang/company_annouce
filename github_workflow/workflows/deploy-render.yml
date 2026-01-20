@@ -1,0 +1,36 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  # ========================================
+  # 作业: 部署到 Render.com
+  # ========================================
+  deploy:
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 触发 Render 部署
+      uses: johnbeynon/render-deploy-action@v0.0.8
+      with:
+        service-id: ${{ secrets.RENDER_SERVICE_ID }}
+        api-key: ${{ secrets.RENDER_API_KEY }}
+        wait-for-success: true
+
+    - name: 部署成功通知
+      if: success()
+      run: |
+        echo "✅ 部署到 Render 成功！"
+
+    - name: 部署失败通知
+      if: failure()
+      run: |
+        echo "❌ 部署到 Render 失败！"
+        exit 1

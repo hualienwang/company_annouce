@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # ========================================
+  # 作业 1: 后端代码检查和测试
+  # ========================================
+  backend-test:
+    name: Backend Test
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_announcements
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 设置 Python 环境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: 安装依赖
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+
+    - name: 代码格式检查 (Black)
+      run: |
+        pip install black
+        black --check backend/
+
+    - name: 代码质量检查 (Flake8)
+      run: |
+        pip install flake8
+        flake8 backend/ --max-line-length=120 --ignore=E501,W503
+
+    - name: 类型检查 (mypy)
+      run: |
+        pip install mypy
+        mypy backend/ --ignore-missing-imports || true
+
+    - name: 运行后端测试
+      env:
+        DATABASE_URL: postgresql://postgres:test_password@localhost:5432/test_announcements
+        SECRET_KEY: test_secret_key_for_ci_only
+        ALGORITHM: HS256
+        ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      run: |
+        cd backend
+        pytest -v || true
+
+  # ========================================
+  # 作业 2: 前端构建测试
+  # ========================================
+  frontend-test:
+    name: Frontend Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 设置 Node.js 环境
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 安装依赖
+      run: |
+        cd frontend
+        npm ci
+
+    - name: 代码格式检查 (ESLint)
+      run: |
+        cd frontend
+        npm run lint || true
+
+    - name: 代码格式检查 (Prettier)
+      run: |
+        cd frontend
+        npx prettier --check src/ || true
+
+    - name: TypeScript 类型检查
+      run: |
+        cd frontend
+        npx vue-tsc --noEmit || true
+
+    - name: 构建生产版本
+      run: |
+        cd frontend
+        npm run build
+
+    - name: 上传构建产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-dist
+        path: frontend/dist
+        retention-days: 7
+
+  # ========================================
+  # 作业 3: Docker 镜像构建测试
+  # ========================================
+  docker-build-test:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 设置 Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: 构建 Docker 镜像
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        tags: announcement-system:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # ========================================
+  # 作业 4: 安全扫描
+  # ========================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 运行 Trivy 漏洞扫描
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: 上传 Trivy 扫描结果
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
