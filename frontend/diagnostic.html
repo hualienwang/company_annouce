@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公告系統診斷工具</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    h1 { color: #333; margin-top: 0; }
+    h2 { color: #555; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover { background: #0056b3; }
+    pre {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      border: 1px solid #dee2e6;
+    }
+    .metric {
+      display: inline-block;
+      margin: 10px 20px 10px 0;
+      padding: 10px 15px;
+      background: #e9ecef;
+      border-radius: 4px;
+    }
+    .metric-value { font-weight: bold; font-size: 1.2em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 公告系統診斷工具</h1>
+    <p>此工具用於診斷公告和意見詢問顯示問題</p>
+
+    <div id="results"></div>
+  </div>
+
+  <script>
+    const results = document.getElementById('results');
+
+    function addSection(title) {
+      const section = document.createElement('div');
+      section.className = 'container';
+      section.innerHTML = `<h2>${title}</h2>`;
+      results.appendChild(section);
+      return section;
+    }
+
+    function addStatus(parent, message, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `status ${type}`;
+      div.textContent = message;
+      parent.appendChild(div);
+      return div;
+    }
+
+    function addCode(parent, code) {
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(code, null, 2);
+      parent.appendChild(pre);
+    }
+
+    async function checkAPI(url, description) {
+      const section = addSection(description);
+      try {
+        const response = await fetch(url);
+        const status = response.status;
+        const data = await response.json();
+
+        if (response.ok) {
+          addStatus(section, `✅ API 請求成功 (狀態碼: ${status})`, 'success');
+
+          if (Array.isArray(data)) {
+            addStatus(section, `📊 返回數據數量: ${data.length}`, 'info');
+          } else if (data && typeof data === 'object') {
+            addStatus(section, `📊 返回對象數據`, 'info');
+          }
+
+          if (data.length > 0) {
+            addStatus(section, `📋 第一條數據:`, 'info');
+            addCode(section, data[0]);
+          }
+        } else {
+          addStatus(section, `❌ API 請求失敗 (狀態碼: ${status})`, 'error');
+          addCode(section, data);
+        }
+
+        return { success: response.ok, data, status };
+      } catch (error) {
+        addStatus(section, `❌ 請求失敗: ${error.message}`, 'error');
+        return { success: false, error: error.message };
+      }
+    }
+
+    async function runDiagnostics() {
+      addStatus(results, '開始診斷...', 'info');
+
+      // 檢查前端服務
+      await checkAPI('http://localhost:5000/', '1. 檢查前端服務');
+
+      // 檢查後端 API
+      await checkAPI('http://localhost:5001/', '2. 檢查後端 API 根路徑');
+
+      // 檢查公告列表
+      const announcementsResult = await checkAPI('http://localhost:5001/api/announcements', '3. 檢查公告列表 API');
+
+      // 統計公告類型
+      if (announcementsResult.success && Array.isArray(announcementsResult.data)) {
+        const announcements = announcementsResult.data;
+        const byType = announcements.reduce((acc, a) => {
+          acc[a.type] = (acc[a.type] || 0) + 1;
+          return acc;
+        }, {});
+
+        const section = addSection('4. 公告類型統計');
+        Object.entries(byType).forEach(([type, count]) => {
+          const metric = document.createElement('div');
+          metric.className = 'metric';
+          metric.innerHTML = `<strong>${type}:</strong> <span class="metric-value">${count}</span> 筆`;
+          section.appendChild(metric);
+        });
+      }
+
+      // 檢查回復列表
+      await checkAPI('http://localhost:5001/api/responses', '5. 檢查回復列表 API');
+
+      // 檢查用戶 API
+      await checkAPI('http://localhost:5001/api/users', '6. 檢查用戶列表 API');
+
+      // 顯示 localStorage 數據
+      const section = addSection('7. 檢查本地存儲');
+      const token = localStorage.getItem('access_token');
+      const user = localStorage.getItem('user');
+
+      if (token) {
+        addStatus(section, '✅ access_token 存在', 'success');
+      } else {
+        addStatus(section, '❌ access_token 不存在', 'error');
+      }
+
+      if (user) {
+        addStatus(section, '✅ user 數據存在', 'success');
+        addCode(section, JSON.parse(user));
+      } else {
+        addStatus(section, '❌ user 數據不存在', 'error');
+      }
+
+      addStatus(results, '診斷完成！', 'success');
+    }
+
+    // 頁面加載時自動運行診斷
+    window.onload = runDiagnostics;
+  </script>
+</body>
+</html>

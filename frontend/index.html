@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>公司公告系统</title>
+
+  <!-- 捕获全局错误并显示在页面上 -->
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      const errorDiv = document.createElement('div');
+      errorDiv.style.cssText = 'position: fixed; top: 10px; left: 10px; right: 10px; background: #fee; border: 2px solid red; padding: 10px; z-index: 9999; font-family: monospace; font-size: 12px; max-height: 50vh; overflow-y: auto;';
+      errorDiv.innerHTML = '<strong style="color: red;">错误:</strong><br>' +
+        '消息: ' + message + '<br>' +
+        '文件: ' + source + '<br>' +
+        '行号: ' + lineno + ':' + colno + '<br>' +
+        '堆栈: ' + (error?.stack || 'N/A');
+      document.body.appendChild(errorDiv);
+      return false;
+    };
+
+    // 捕获未处理的 Promise 错误
+    window.addEventListener('unhandledrejection', function(event) {
+      const errorDiv = document.createElement('div');
+      errorDiv.style.cssText = 'position: fixed; top: 10px; left: 10px; right: 10px; background: #fee; border: 2px solid red; padding: 10px; z-index: 9999; font-family: monospace; font-size: 12px; margin-top: 10px; max-height: 50vh; overflow-y: auto;';
+      errorDiv.innerHTML = '<strong style="color: red;">Promise 错误:</strong><br>' +
+        '原因: ' + (event.reason || 'Unknown');
+      document.body.appendChild(errorDiv);
+    });
+  </script>
+
+  <!-- 加载指示器 -->
+  <div id="loading" style="display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; background: #f9fafb;">
+    <div style="text-align: center;">
+      <div style="font-size: 24px; margin-bottom: 10px;">⏳</div>
+      <div>正在加载应用...</div>
+      <div id="loading-status" style="color: #666; font-size: 14px; margin-top: 10px;"></div>
+      <div id="loading-errors" style="color: red; font-size: 14px; margin-top: 10px; max-width: 500px; margin-left: auto; margin-right: auto;"></div>
+    </div>
+  </div>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

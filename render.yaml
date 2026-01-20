@@ -1,0 +1,153 @@
+# Render.com 部署配置文件
+# 公司公告与意见收集系统
+#
+# 部署说明：
+# 1. 将此文件提交到项目根目录
+# 2. 在 Render.com 创建新 Web Service，选择 "Deploy from existing repository"
+# 3. Render 会自动读取此配置文件进行部署
+# 4. 首次部署后，需要手动配置环境变量（SMTP、S3等）
+
+services:
+  # Web Service - FastAPI 后端 + 前端静态文件
+  - type: web
+    name: announcement-system
+    env: python
+    region: oregon  # 可选: singapore, oregon, frankfurt, ohio
+    plan: starter  # 可选: free, starter, standard
+
+    # Python 版本配置
+    runtime: "3.11"
+
+    # 构建命令：安装后端依赖 + 构建前端
+    buildCommand: |
+      pip install --upgrade pip &&
+      pip install -r backend/requirements.txt &&
+      cd frontend &&
+      npm install &&
+      npm run build &&
+      cd ..
+
+    # 启动命令：运行 FastAPI 服务（同时提供 API 和静态文件服务）
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+
+    # 健康检查
+    healthCheckPath: /health
+
+    # 环境变量配置
+    envVars:
+      # ====================
+      # 数据库配置（自动从 PostgreSQL 服务获取）
+      # ====================
+      - key: DATABASE_URL
+        fromDatabase:
+          name: announcement-db
+          property: connectionString
+
+      # ====================
+      # 应用配置
+      # ====================
+      - key: PORT
+        value: 10000
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      # ====================
+      # SMTP 邮件发送配置
+      # 部署后在 Render Dashboard 中手动配置
+      # ====================
+      - key: SMTP_SERVER
+        value: smtp.gmail.com  # 默认值，可修改
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false  # 需要手动配置
+      - key: SMTP_PASSWORD
+        sync: false  # 需要手动配置
+      - key: SMTP_FROM_EMAIL
+        sync: false  # 需要手动配置
+
+      # ====================
+      # S3 对象存储配置（可选）
+      # 部署后在 Render Dashboard 中手动配置
+      # ====================
+      - key: COZE_BUCKET_ENDPOINT_URL
+        sync: false  # 需要手动配置
+      - key: COZE_BUCKET_NAME
+        sync: false  # 需要手动配置
+
+      # ====================
+      # 文件存储配置
+      # ====================
+      - key: FILE_STORAGE_TYPE
+        value: local  # 可选: local, s3
+      - key: FILE_UPLOAD_DIR
+        value: /tmp/file_uploads
+
+    # 磁盘配置（用于文件上传）
+    disk:
+      name: data
+      mountPath: /tmp/file_uploads
+      sizeGB: 1
+
+    # 构建超时设置
+    buildTimeout: 900  # 15分钟
+
+# ====================
+# PostgreSQL 数据库配置
+# ====================
+databases:
+  - name: announcement-db
+    databaseName: announcements
+    user: postgres
+    region: oregon
+    plan: starter  # 可选: free, starter, standard, pro, pro-x
+
+    # 数据库版本
+    version: "16"
+
+    # 数据库配置
+    ipAllowList:
+      - source: 0.0.0.0/0  # 允许所有 IP 访问（仅用于开发）
+        description: "Allow all IPs"
+
+    # 备份配置
+    maxBackups: 3
+    backupRetentionDays: 7
+
+# ====================
+# 部署注意事项
+# ====================
+# 1. 首次部署后，需要在 Render Dashboard > Environment 中配置：
+#    - SMTP_USERNAME: SMTP 用户名
+#    - SMTP_PASSWORD: SMTP 密码或应用专用密码
+#    - SMTP_FROM_EMAIL: 发件人邮箱
+#    - COZE_BUCKET_ENDPOINT_URL: S3 端点 URL（如需使用对象存储）
+#    - COZE_BUCKET_NAME: S3 存储桶名称（如需使用对象存储）
+#
+# 2. Gmail SMTP 配置示例：
+#    - SMTP_SERVER: smtp.gmail.com
+#    - SMTP_PORT: 587
+#    - 需要在 Gmail 账户设置中启用"应用专用密码"
+#
+# 3. 访问地址：
+#    - 部署完成后，访问: https://announcement-system.onrender.com
+#    - 默认管理员账号：admin@example.com / admin123
+#
+# 4. 监控和日志：
+#    - 在 Render Dashboard 中查看应用日志
+#    - 配置健康检查：/health
+#
+# 5. 自定义域名：
+#    - 在 Render Dashboard > Settings > Domains 中添加自定义域名
+#    - 按照提示配置 DNS 记录
+#
+# 6. 性能优化：
+#    - 生产环境建议升级到 Standard 或 Pro 计划
+#    - 数据库建议升级到 Starter 或更高计划
+#    - 启用自动缩放（Standard 计划及以上）
+#
+# 7. 安全建议：
+#    - 使用环境变量存储敏感信息
+#    - 启用 HTTPS（Render 自动提供）
+#    - 限制数据库 IP 白名单（生产环境）
+#    - 定期更新依赖包

@@ -1,0 +1,168 @@
+# Render.com Docker 部署配置文件（备选方案）
+# 公司公告与意见收集系统
+#
+# 部署说明：
+# 1. 将此文件重命名为 render.yaml 即可使用 Docker 部署
+# 2. 或者直接在 Render Dashboard 中手动选择 Docker 环境
+# 3. 需要确保 Dockerfile 存在于项目根目录
+#
+# Docker 部署优势：
+# - 环境一致性（开发、测试、生产完全一致）
+# - 更好的依赖管理
+# - 支持本地测试
+# - 更快的部署速度
+# - 提高安全性
+
+services:
+  # Web Service - FastAPI 后端 + 前端静态文件
+  - type: web
+    name: announcement-system
+    env: docker
+    region: oregon  # 可选: singapore, oregon, frankfurt, ohio
+    plan: starter  # 可选: free, starter, standard
+
+    # Docker 配置
+    # Render 会自动使用项目根目录的 Dockerfile
+    # Dockerfile 使用多阶段构建：先构建前端，再构建后端，最后合并
+
+    # 健康检查（Dockerfile 中已定义，但可以在此覆盖）
+    healthCheckPath: /health
+
+    # 环境变量配置
+    envVars:
+      # ====================
+      # 数据库配置（自动从 PostgreSQL 服务获取）
+      # ====================
+      - key: DATABASE_URL
+        fromDatabase:
+          name: announcement-db
+          property: connectionString
+
+      # ====================
+      # 应用配置
+      # ====================
+      - key: PORT
+        value: 10000
+
+      # ====================
+      # SMTP 邮件发送配置
+      # 部署后在 Render Dashboard 中手动配置
+      # ====================
+      - key: SMTP_SERVER
+        value: smtp.gmail.com  # 默认值，可修改
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false  # 需要手动配置
+      - key: SMTP_PASSWORD
+        sync: false  # 需要手动配置
+      - key: SMTP_FROM_EMAIL
+        sync: false  # 需要手动配置
+
+      # ====================
+      # S3 对象存储配置（可选）
+      # 部署后在 Render Dashboard 中手动配置
+      # ====================
+      - key: COZE_BUCKET_ENDPOINT_URL
+        sync: false  # 需要手动配置
+      - key: COZE_BUCKET_NAME
+        sync: false  # 需要手动配置
+
+      # ====================
+      # 文件存储配置
+      # ====================
+      - key: FILE_STORAGE_TYPE
+        value: local  # 可选: local, s3
+      - key: FILE_UPLOAD_DIR
+        value: /app/file_uploads
+
+    # 磁盘配置（用于文件上传）
+    # 挂载路径必须与 Dockerfile 中的目录一致
+    disk:
+      name: data
+      mountPath: /app/file_uploads
+      sizeGB: 1
+
+    # 构建超时设置
+    buildTimeout: 900  # 15分钟
+
+# ====================
+# PostgreSQL 数据库配置
+# ====================
+databases:
+  - name: announcement-db
+    databaseName: announcements
+    user: postgres
+    region: oregon
+    plan: starter  # 可选: free, starter, standard, pro, pro-x
+
+    # 数据库版本
+    version: "16"
+
+    # 数据库配置
+    ipAllowList:
+      - source: 0.0.0.0/0  # 允许所有 IP 访问（仅用于开发）
+        description: "Allow all IPs"
+
+    # 备份配置
+    maxBackups: 3
+    backupRetentionDays: 7
+
+# ====================
+# 部署注意事项
+# ====================
+# 1. Dockerfile 说明：
+#    - 使用多阶段构建：先构建前端（Node.js），再构建后端（Python）
+#    - 最终镜像：Python 3.12 + FastAPI + 前端静态文件
+#    - 文件上传目录：/app/file_uploads
+#    - 端口：使用 PORT 环境变量（默认 10000）
+#
+# 2. 首次部署后，需要在 Render Dashboard > Environment 中配置：
+#    - SMTP_USERNAME: SMTP 用户名
+#    - SMTP_PASSWORD: SMTP 密码或应用专用密码
+#    - SMTP_FROM_EMAIL: 发件人邮箱
+#    - COZE_BUCKET_ENDPOINT_URL: S3 端点 URL（如需使用对象存储）
+#    - COZE_BUCKET_NAME: S3 存储桶名称（如需使用对象存储）
+#
+# 3. Gmail SMTP 配置示例：
+#    - SMTP_SERVER: smtp.gmail.com
+#    - SMTP_PORT: 587
+#    - 需要在 Gmail 账户设置中启用"应用专用密码"
+#
+# 4. 访问地址：
+#    - 部署完成后，访问: https://announcement-system.onrender.com
+#    - 默认管理员账号：admin@example.com / admin123
+#
+# 5. 监控和日志：
+#    - 在 Render Dashboard 中查看应用日志
+#    - Dockerfile 中已配置健康检查（/health 端点）
+#
+# 6. 自定义域名：
+#    - 在 Render Dashboard > Settings > Domains 中添加自定义域名
+#    - 按照提示配置 DNS 记录
+#
+# 7. 性能优化：
+#    - 生产环境建议升级到 Standard 或 Pro 计划
+#    - 数据库建议升级到 Starter 或更高计划
+#    - 启用自动缩放（Standard 计划及以上）
+#
+# 8. 安全建议：
+#    - 使用环境变量存储敏感信息
+#    - 启用 HTTPS（Render 自动提供）
+#    - 限制数据库 IP 白名单（生产环境）
+#    - 定期更新依赖包和基础镜像
+
+# ====================
+# 如何使用此配置
+# ====================
+# 方式一：重命名文件（推荐）
+# mv render-docker.yaml render.yaml
+# git add render.yaml
+# git commit -m "Switch to Docker deployment"
+# git push
+
+# 方式二：手动选择环境
+# 在 Render Dashboard 创建服务时：
+# 1. 选择 "Existing Repository"
+# 2. 选择仓库后，在 "Environment" 中选择 "Docker"
+# 3. Render 会自动使用 Dockerfile

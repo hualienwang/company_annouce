@@ -1,0 +1,11 @@
+[project]
+entrypoint = "frontend/index.html"
+requires = ["nodejs-24"]
+
+[dev]
+build = ["bash", "-c", "cd frontend && npm install"]
+run = ["bash", ".cozeproj/scripts/dev_run.sh"]
+
+[deploy]
+build = ["bash", "-c", "cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt"]
+run = ["bash", ".cozeproj/scripts/deploy_run.sh"]
