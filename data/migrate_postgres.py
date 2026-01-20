@@ -10,8 +10,8 @@ import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 # 添加项目路径
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
+# project_root = Path(__file__).parent
+# sys.path.insert(0, str(project_root))
 
 # PostgreSQL 连接信息
 DATABASE_URL = "postgresql://postgres:1234@localhost:5432/postgres"
