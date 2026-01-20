@@ -7,7 +7,7 @@ def migrate_database():
     print("開始遷移數據庫...")
     
     # 連接到數據庫
-    conn = sqlite3.connect('/workspace/data/company.db')
+    conn = sqlite3.connect('D:/develop/Python/company_annouce/data/company.db')
     cursor = conn.cursor()
     
     # 檢查announcement表是否缺少file_key和file_name字段

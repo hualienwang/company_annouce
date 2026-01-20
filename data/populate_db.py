@@ -190,7 +190,7 @@ def populate_database():
     print("=" * 60)
 
     # 使用SQLite數據庫（使用絕對路徑）
-    DATABASE_URL = f"sqlite:////workspace/data/company.db"
+    DATABASE_URL = f"sqlite:///D:/develop/Python/company_annouce/data/company.db"
     engine = create_engine(DATABASE_URL)
     
     with Session(engine) as session:

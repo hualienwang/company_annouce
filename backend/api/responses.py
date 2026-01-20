@@ -27,7 +27,7 @@ async def create_response(
 ):
     """创建回复（支持文件上传）"""
     # 验证公告是否存在
-    from backend.models import Announcement
+    # from backend.models import Announcement
     announcement = session.get(Announcement, announcement_id)
     if not announcement:
         raise HTTPException(status_code=404, detail="公告不存在")
